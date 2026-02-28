@@ -33,7 +33,7 @@ Designed as the data layer for **personal activity review and life logging**. Yo
 
 ## Quick Start
 
-**Requirements:** macOS 13+ (Apple Silicon or Intel) · Xcode Command Line Tools
+**Requirements:** macOS 13+ (Apple Silicon or Intel) · Xcode Command Line Tools · SQLite3 (pre-installed on macOS)
 
 ```bash
 git clone https://github.com/Tiny-cyber/clip-log.git

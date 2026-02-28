@@ -33,7 +33,7 @@
 
 ## 快速开始
 
-**环境要求：** macOS 13+（Apple Silicon 或 Intel）· Xcode 命令行工具
+**环境要求：** macOS 13+（Apple Silicon 或 Intel）· Xcode 命令行工具 · SQLite3（macOS 系统自带，无需安装）
 
 ```bash
 # 安装 Xcode 命令行工具（如果没有）
