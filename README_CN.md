@@ -2,9 +2,9 @@
 
 # clip-log
 
-**轻量级 macOS 剪贴板历史记录工具**
+**轻量级 macOS 个人活动追踪工具**
 
-单文件 · 零依赖 · 57KB
+剪贴板历史 + 应用使用追踪 · 零依赖
 
 [![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)](https://swift.org)
 [![macOS](https://img.shields.io/badge/macOS-13%2B-blue.svg)](https://www.apple.com/macos)
@@ -16,11 +16,16 @@
 
 ---
 
-在后台默默记录你每次复制的文本 —— **复制了什么**、**什么时候**、**在哪个 App 里复制的** —— 全部存入本地 SQLite 数据库。
+两个轻量后台守护进程，被动追踪你在 macOS 上的日常活动：
 
-你的剪贴板记录了你一天的轨迹：搜了什么、问了什么、关注了什么。clip-log 把这些轨迹沉淀下来，作为**个人活动回顾和生活记录**的数据基础。
+- **clip-log** — 记录你每次复制的文本（复制了什么、什么时候、在哪个 App 里）
+- **app-tracker** — 记录你使用了哪些 App、每个用了多久（含窗口标题）
+
+所有数据存在同一个本地 SQLite 数据库，作为**个人活动回顾和生活记录**的数据基础。
 
 ## 功能特性
+
+### clip-log（剪贴板历史）
 
 | 特性 | 说明 |
 |------|------|
@@ -30,6 +35,16 @@
 | **来源追踪** | 记录复制时所在的应用名称 |
 | **开机自启** | 作为 macOS LaunchAgent 运行，登录即启动，崩溃自动重启 |
 | **本地隐私** | 所有数据存在 `~/.clip-log/history.db`，不联网，不上传 |
+
+### app-tracker（应用追踪）
+
+| 特性 | 说明 |
+|------|------|
+| **使用时长** | 追踪前台 App 及使用时长 |
+| **窗口标题** | 记录你在每个 App 里干什么（看哪个网页、编辑哪个文件） |
+| **噪音过滤** | 自动过滤终端 spinner 动画等干扰字符 |
+| **短切过滤** | 不到 2 秒的 App 切换自动忽略 |
+| **共享数据库** | 与 clip-log 共用同一个 `history.db` |
 
 ## 快速开始
 
@@ -46,7 +61,7 @@ chmod +x install.sh
 ./install.sh
 ```
 
-安装完成，clip-log 已在后台运行。
+安装完成，clip-log 和 app-tracker 都已在后台运行。
 
 > 卸载：`./uninstall.sh`（数据会保留，不会删除）
 
@@ -114,6 +129,7 @@ sqlite3 -header -csv ~/.clip-log/history.db \
 ## 数据库结构
 
 ```sql
+-- clip-log
 CREATE TABLE clipboard (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     content   TEXT    NOT NULL,
@@ -121,15 +137,27 @@ CREATE TABLE clipboard (
     app_name  TEXT               -- 来源应用名称
 );
 CREATE INDEX idx_timestamp ON clipboard(timestamp);
+
+-- app-tracker
+CREATE TABLE app_usage (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    app_name     TEXT    NOT NULL,
+    window_title TEXT,
+    start_time   INTEGER NOT NULL,  -- Unix 时间戳（秒）
+    duration     INTEGER NOT NULL   -- 秒
+);
+CREATE INDEX idx_app_start ON app_usage(start_time);
 ```
 
 ## 文件说明
 
 ```
 ~/.clip-log/
-├── history.db        # SQLite 数据库（你的数据）
-├── clip-log.log      # 运行日志
-└── clip-log.err.log  # 错误日志
+├── history.db            # SQLite 数据库（两个守护进程共用）
+├── clip-log.log          # clip-log 运行日志
+├── clip-log.err.log      # clip-log 错误日志
+├── app-tracker.log       # app-tracker 运行日志
+└── app-tracker.err.log   # app-tracker 错误日志
 ```
 
 ## 实时监控

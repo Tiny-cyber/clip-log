@@ -2,9 +2,9 @@
 
 # clip-log
 
-**Lightweight macOS clipboard history daemon**
+**Lightweight macOS personal activity tracker**
 
-One file · Zero dependencies · 57KB binary
+Clipboard history + App usage tracking · Zero dependencies
 
 [![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)](https://swift.org)
 [![macOS](https://img.shields.io/badge/macOS-13%2B-blue.svg)](https://www.apple.com/macos)
@@ -16,11 +16,16 @@ One file · Zero dependencies · 57KB binary
 
 ---
 
-Silently records every text you copy — **what** you copied, **when**, and **from which app** — into a local SQLite database.
+Two lightweight daemons that passively track your daily activity on macOS:
 
-Designed as the data layer for **personal activity review and life logging**. Your clipboard tells the story of your day: what you searched, what you asked, what caught your attention.
+- **clip-log** — records every text you copy (what, when, from which app)
+- **app-tracker** — records which apps you use and for how long (with window titles)
+
+All data stays local in a single SQLite database. Designed as the data layer for **personal activity review and life logging**.
 
 ## Features
+
+### clip-log (clipboard history)
 
 | Feature | Description |
 |---------|-------------|
@@ -30,6 +35,16 @@ Designed as the data layer for **personal activity review and life logging**. Yo
 | **Source tracking** | Records which app the copy came from |
 | **Auto-start** | macOS LaunchAgent, starts on login, auto-restarts on crash |
 | **Local & private** | All data stays in `~/.clip-log/history.db`, nothing leaves your machine |
+
+### app-tracker (app usage tracking)
+
+| Feature | Description |
+|---------|-------------|
+| **App usage time** | Tracks which app is in the foreground and for how long |
+| **Window titles** | Records what you're doing in each app (e.g. which webpage, which file) |
+| **Noise filtering** | Strips spinner animations and other noise from window titles |
+| **Short switch filter** | Ignores app switches under 2 seconds (just passing through) |
+| **Shared database** | Uses the same `history.db` as clip-log |
 
 ## Quick Start
 
@@ -110,6 +125,7 @@ sqlite3 -header -csv ~/.clip-log/history.db \
 ## Database Schema
 
 ```sql
+-- clip-log
 CREATE TABLE clipboard (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     content   TEXT    NOT NULL,
@@ -117,15 +133,27 @@ CREATE TABLE clipboard (
     app_name  TEXT               -- Source application
 );
 CREATE INDEX idx_timestamp ON clipboard(timestamp);
+
+-- app-tracker
+CREATE TABLE app_usage (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    app_name     TEXT    NOT NULL,
+    window_title TEXT,
+    start_time   INTEGER NOT NULL,  -- Unix epoch seconds
+    duration     INTEGER NOT NULL   -- seconds
+);
+CREATE INDEX idx_app_start ON app_usage(start_time);
 ```
 
 ## File Structure
 
 ```
 ~/.clip-log/
-├── history.db        # SQLite database (your data)
-├── clip-log.log      # stdout log
-└── clip-log.err.log  # stderr log
+├── history.db            # SQLite database (shared by both daemons)
+├── clip-log.log          # clip-log stdout log
+├── clip-log.err.log      # clip-log stderr log
+├── app-tracker.log       # app-tracker stdout log
+└── app-tracker.err.log   # app-tracker stderr log
 ```
 
 ## License
