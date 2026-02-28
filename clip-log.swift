@@ -8,6 +8,13 @@ let dataDir = homeDir + "/.clip-log"
 let dbPath  = dataDir + "/history.db"
 let maxLength = 1000  // skip entries longer than this (utility copy-paste)
 
+// Apps that handle sensitive data — clipboard from these is never recorded
+let blockedApps: Set<String> = [
+    "1Password", "Keychain Access", "钥匙串访问",
+    "Bitwarden", "LastPass", "KeePassXC", "Dashlane",
+    "Enpass", "RoboForm", "Keeper",
+]
+
 // ─── SQLite helpers ─────────────────────────────────────────────
 
 var db: OpaquePointer?
@@ -79,6 +86,7 @@ func insertEntry(content: String, appName: String?) {
 
 let pasteboard = NSPasteboard.general
 var lastChangeCount = pasteboard.changeCount
+var lastRecordedText: String? = nil  // in-memory dedup (catches rapid double-fires)
 
 func checkClipboard() {
     let currentCount = pasteboard.changeCount
@@ -91,12 +99,44 @@ func checkClipboard() {
     // Skip long texts (likely utility copy-paste, not personal input)
     if text.count > maxLength { return }
 
-    // Dedup: check against last entry in DB (survives restarts)
+    // Skip sensitive content (API keys, tokens, secrets)
+    let lower = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+    let looksLikeKey = lower.hasPrefix("sk-ant-")       // Anthropic
+        || lower.hasPrefix("sk-")                       // OpenAI / Stripe
+        || lower.hasPrefix("sk_")                       // Stripe etc.
+        || lower.hasPrefix("ghp_")                      // GitHub PAT
+        || lower.hasPrefix("gho_")                      // GitHub OAuth
+        || lower.hasPrefix("ghs_")                      // GitHub App
+        || lower.hasPrefix("github_pat_")               // GitHub fine-grained
+        || lower.hasPrefix("aig_")                      // AI keys
+        || lower.hasPrefix("aizasy")                    // Google API key
+        || lower.hasPrefix("xai-")                      // xAI / Grok
+        || lower.hasPrefix("hf_")                       // HuggingFace
+        || lower.hasPrefix("r8_")                       // Replicate
+        || lower.hasPrefix("tvly-")                     // Tavily
+        || lower.hasPrefix("sess-")                     // Session tokens
+        || lower.hasPrefix("eyj")                       // JWT tokens (base64 of {"...)
+        || lower.contains("api_key")
+        || lower.contains("apikey")
+        || lower.contains("secret_key")
+        || lower.contains("access_token")
+        || lower.contains("bearer ")
+        || (text.count >= 32 && text.range(of: "^[A-Za-z0-9+/=_\\-]{32,}$", options: .regularExpression) != nil)
+    if looksLikeKey { return }
+
+    // In-memory dedup: catch rapid double changeCount fires
+    if text == lastRecordedText { return }
+
+    // DB dedup: survives restarts
     if text == getLastContent() { return }
 
     let appName = NSWorkspace.shared.frontmostApplication?.localizedName
 
+    // Skip sensitive apps (password managers etc.)
+    if let app = appName, blockedApps.contains(app) { return }
+
     insertEntry(content: text, appName: appName)
+    lastRecordedText = text
 
     let preview = text.prefix(60).replacingOccurrences(of: "\n", with: "\\n")
     let timestamp = ISO8601DateFormatter().string(from: Date())
